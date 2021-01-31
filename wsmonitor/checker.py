@@ -8,7 +8,7 @@ import re
 from wsmonitor import api
 from wsmonitor.config import config
 
-MAX_THREADS = 8
+MAX_THREADS = 4
 TIMEOUT = 30
 CHECK_PERIOD = 20
 

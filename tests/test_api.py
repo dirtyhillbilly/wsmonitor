@@ -5,17 +5,17 @@ import threading
 
 
 def test_init():
-    api.database_reset(config)
     api.database_init(config)
 
 
 def test_url_add_remove():
+    api.database_init(config)
     url = 'foo://some url'
     regexp = 'some regexp'
-    api.url_add(config, url, regexp)
+    url_id = api.url_add(config, url, regexp)
     res = [(url[1], url[2]) for url in api.url_list(config)]
     assert res[0] == (url, regexp)
-    api.url_remove(config, url)
+    api.url_remove(config, url_id)
     res = [url for url in api.url_list(config)]
     assert res == []
 
@@ -27,7 +27,7 @@ cases = [('https://help.aiven.io/en/', None, 200, None),
          ('https://aiven.io/', None, 200, None),
          ('https://aiven.io/', 'free software conspiracy', 200, False),
          ('http://bad.domain.namez', None, 503, None),
-         ('!@#$', None, 599, None),
+         ('!@#$', None, -1, None),
          ('http://www.google.com/should-404', None, 404, None),
          ('https://www.google.fr/search?q='+'403'*1024, None, 403, None)]
 

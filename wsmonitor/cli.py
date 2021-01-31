@@ -37,18 +37,9 @@ def url():
 @click.pass_obj
 def database_init(context):
     """
-    Initialize database.
+    Initialize or reset database.
     """
     api.database_init(_config)
-
-
-@url.command('reset')
-@click.pass_obj
-def database_reset(context):
-    """
-    Empty database.
-    """
-    api.database_reset(_config)
 
 
 #
