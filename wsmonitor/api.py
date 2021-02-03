@@ -3,12 +3,22 @@ import psycopg2.pool
 import threading
 import datetime
 import re
+import json
+import ssl
+import os
+from kafka import KafkaAdminClient, KafkaConsumer, KafkaProducer
+from kafka.admin import NewTopic
+import kafka.errors
 
 
 #
 # Errors
 #
 class DatabaseError(Exception):
+    pass
+
+
+class KafkaError(Exception):
     pass
 
 
@@ -19,7 +29,7 @@ def _cast_metric(value, cur):
     """
     Cast a metric from postgres to python.
 
-    Return (timestamp, response_time, return_code, regexp_check) tuple.
+    Return (timestamp, response_time, return_code, regex_check) tuple.
     """
 
     if value is None:
@@ -34,21 +44,21 @@ def _cast_metric(value, cur):
         response_time = int(m.group(2))
         return_code = int(m.group(3))
         if m.group(4) == '':
-            regexp_check = None
+            regex_check = None
         elif m.group(4) == 'f':
-            regexp_check = False
+            regex_check = False
         elif m.group(4) == 't':
-            regexp_check = True
+            regex_check = True
         else:
             raise psycopg2.InterfaceError(
-                f"bad metric for regexp_check: {value}")
+                f"bad metric for regex_check: {value}")
     else:
         raise psycopg2.InterfaceError(f"bad metric representation: {value}")
 
-    return (ts, response_time, return_code, regexp_check)
+    return (ts, response_time, return_code, regex_check)
 
 
-_connection_pool = None
+_connection_pool = None  # singleton connection pool instance
 _connection_pool_lock = threading.Lock()
 
 
@@ -120,8 +130,6 @@ class MetricConnectionPool(psycopg2.pool.ThreadedConnectionPool):
 def _get_db_connection(config):
     """
     Return psycopg2 connection object to database.
-
-    TODO: Use connection pools
     """
 
     global _connection_pool
@@ -214,6 +222,104 @@ def database_add_metric(config, url_id, timestamp, response_time, return_code,
                     regex_check, url_id))
     conn.commit()
     _release_db_connection(conn)
+
+
+#
+# Kafka message queue API
+#
+
+_kafka_producer = None  # singleton producer instance
+_kafka_producer_lock = threading.Lock()
+
+
+def _kafka_init_topic(config):
+    """
+    Create kafka topic on borker
+    """
+
+    admin = KafkaAdminClient(bootstrap_servers=config['kafka-broker'],
+                             security_protocol="SASL_SSL",
+                             ssl_cafile=_get_kafka_ca_file(config),
+                             sasl_mechanism="PLAIN",
+                             sasl_plain_username=config['kafka-user'],
+                             sasl_plain_password=config['kafka-password'])
+    topic = NewTopic(name=config['kafka-topic'],
+                     num_partitions=1,
+                     replication_factor=1)
+
+    try:
+        admin.create_topics([topic])
+    except kafka.errors.TopicAlreadyExistsError:
+        pass
+    except Exception:
+        raise
+
+    admin.close()
+
+
+def _get_kafka_ca_file(config):
+    if config['kafka-ca-file'] is None:
+        return None
+    else:
+        return os.path.expanduser(config['kafka-ca-file'])
+
+
+def _get_kafka_producer(config):
+    """
+    Get a kafka producer for our topic.
+    """
+    global _kafka_producer
+
+    acquired = _kafka_producer_lock.acquire(timeout=20)
+    if not acquired:
+        raise KafkaError(f"Can't acquire lock to kafka producer")
+
+    if _kafka_producer is None:
+        _kafka_init_topic(config)
+
+        _kafka_producer = KafkaProducer(
+            bootstrap_servers=config['kafka-broker'],
+            security_protocol="SASL_SSL",
+            ssl_cafile=_get_kafka_ca_file(config),
+            sasl_mechanism="PLAIN",
+            sasl_plain_username=config['kafka-user'],
+            sasl_plain_password=config['kafka-password'])
+
+    _kafka_producer_lock.release()
+    return _kafka_producer
+
+
+def kafka_send_metric(config, url_id, timestamp, response_time, return_code,
+                      regex_check):
+    """
+    Send a metric to kafka broker
+    """
+    p = _get_kafka_producer(config)
+    metric = (url_id, timestamp.isoformat(' ', timespec='seconds'),
+              response_time, return_code, regex_check)
+    msg = bytes(json.dumps(metric).encode('utf-8'))
+    print(msg)
+    p.send(config['kafka-topic'], msg)
+
+
+def kafka_get_metrics(config):
+    """
+    Generator that wait for a metric to be published on topic.
+
+    Yield tuple (url_id, timestamp, response_time, return_code, regex_check)
+    """
+    _kafka_init_topic(config)
+    consumer = KafkaConsumer(config['kafka-topic'],
+                             bootstrap_servers=config['kafka-broker'],
+                             auto_offset_reset='earliest',
+                             security_protocol="SASL_SSL",
+                             ssl_cafile=_get_kafka_ca_file(config),
+                             sasl_mechanism="PLAIN",
+                             sasl_plain_username=config['kafka-user'],
+                             sasl_plain_password=config['kafka-password'])
+    for msg in consumer:
+        metric = json.loads(msg.value)
+        yield metric
 
 
 #

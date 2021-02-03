@@ -29,11 +29,11 @@ def cli(ctx, **kwargs):
 # 'database' group
 #
 @cli.group('database')
-def url():
+def database():
     """Manage database backend"""
 
 
-@url.command('init')
+@database.command('init')
 @click.pass_obj
 def database_init(context):
     """

@@ -26,7 +26,10 @@ config = {
     'database-password': None,
 
     # kafka parameters
-    'kafka-host': None,
+    'kafka-broker': None,
+    'kafka-user': None,
+    'kafka-password': None,
+    'kafka-ca-file': None,
 
     # global parameters
     'pretty-print': False,

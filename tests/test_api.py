@@ -1,7 +1,23 @@
 from wsmonitor import api
-from wsmonitor.config import config
 from wsmonitor.checker import check_url
+import time
 import threading
+
+
+# TODO: proper tests should use proper kafka and posgresql containers
+config = {
+    'database-host': 'wsmon-pg-praksys-41e8.aivencloud.com',
+    'database-name': 'wsmonitor',
+    'database-password': 'fjm6xcctiilz2yn2',
+    'database-port': 15383,
+    'database-user': 'avnadmin',
+    'kafka-broker': 'wsmon-kafka-praksys-41e8.aivencloud.com:15396',
+    'kafka-user': 'avnadmin',
+    'kafka-password': 'sbrnbs6a90rdniip',
+    'kafka-topic': 'wsmonitor',
+    'kafka-ca-file': '~/.config/wsmonitor/ca.crt',
+    'pretty-print': False
+    }
 
 
 def test_init():
@@ -33,6 +49,8 @@ cases = [('https://help.aiven.io/en/', None, 200, None),
 
 
 def test_url_check():
+    api.database_init(config)
+
     checks = {}
 
     # check each URL once
@@ -47,6 +65,8 @@ def test_url_check():
 
     for t in checks.values():
         t[0].join()
+
+    time.sleep(10)
 
     # gather results
     for _id, url, metrics in api.url_status(config, checks.keys()):

@@ -1,3 +1,8 @@
+#
+# Checker daemon. Periodically check website availability and report to kafka queue.
+#
+
+
 import threading
 import queue
 import urllib.request
@@ -37,9 +42,9 @@ def check_url(url_id, url, regexp, timeout):
     else:
         regexp_check = None
 
-    api.database_add_metric(config, url_id, now,
-                            response_time / datetime.timedelta(microseconds=1),
-                            return_code, regexp_check)
+    api.kafka_send_metric(config, url_id, now,
+                          response_time / datetime.timedelta(microseconds=1),
+                          return_code, regexp_check)
 
 
 def loop_over_urls():
@@ -65,7 +70,7 @@ def worker():
 
 def checker():
     """
-    Main checker process.
+    Main checker process entry point.
     """
 
     # Start a bunch of worker threads

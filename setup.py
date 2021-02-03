@@ -8,9 +8,9 @@ setup(
     description="Website monitor.",
     license="GPLv3+",
     packages=['wsmonitor'],
-    setup_requires=['psycopg2', 'click'],
+    setup_requires=['psycopg2', 'click', 'kafka-python'],
     tests_require=['pytest'],
-    install_requires=['psycopg2', 'click'],
+    install_requires=['psycopg2', 'click', 'kafka-python'],
     package_data={'wsmonitor': ['lib/wsmonitor-checker.service',
                                 'lib/wsmonitor-dbupdate.service']},
     classifiers=[
