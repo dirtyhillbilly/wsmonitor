@@ -231,6 +231,13 @@ _kafka_producer = None  # singleton producer instance
 _kafka_producer_lock = threading.Lock()
 
 
+def _get_kafka_ca_file(config):
+    if config['kafka-ca-file'] is None:
+        return None
+    else:
+        return os.path.expandvars(os.path.expanduser(config['kafka-ca-file']))
+
+
 def _kafka_init_topic(config):
     """
     Create kafka topic on borker
@@ -254,13 +261,6 @@ def _kafka_init_topic(config):
         raise
 
     admin.close()
-
-
-def _get_kafka_ca_file(config):
-    if config['kafka-ca-file'] is None:
-        return None
-    else:
-        return os.path.expanduser(config['kafka-ca-file'])
 
 
 def _get_kafka_producer(config):

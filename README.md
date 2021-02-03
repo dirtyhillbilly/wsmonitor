@@ -30,6 +30,10 @@ For testing purpose, from source root directory, you can install `wsmonitor` dep
 
 	pip install -e .
 
+## Configuration ##
+
+For now, files in `data` directories should be copied to `$HOME/.config/wsconfig`.
+
 # Running daemons #
 
 In the virtual environement, two programs are available :
