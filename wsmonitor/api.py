@@ -4,7 +4,6 @@ import threading
 import datetime
 import re
 import json
-import ssl
 import os
 from kafka import KafkaAdminClient, KafkaConsumer, KafkaProducer
 from kafka.admin import NewTopic
@@ -54,7 +53,6 @@ def _cast_metric(value, cur):
                 f"bad metric for regex_check: {value}")
     else:
         raise psycopg2.InterfaceError(f"bad metric representation: {value}")
-
     return (ts, response_time, return_code, regex_check)
 
 
@@ -77,34 +75,47 @@ class MetricConnectionPool(psycopg2.pool.ThreadedConnectionPool):
         self.array_oid = None
         super().__init__(2, 2, *args, **kwargs)
 
+    @staticmethod
+    def _get_metric_type(cursor):
+        cursor.execute("SELECT oid, typarray FROM pg_type "
+                       "WHERE typname = 'metric'")
+        return cursor.fetchone()
+
+    @staticmethod
+    def _create_metric_type(cursor):
+        try:
+            cursor.execute("CREATE TYPE metric AS (time_stamp TIMESTAMP(0) "
+                           "WITH TIME ZONE, response_time INTEGER, "
+                           "return_code INTEGER, regex_check BOOL)")
+        except Exception:
+            pass
+
     def _register_metric_types(self, conn):
         """
         Create psycopg2 types for metrics and arrays of metrics.
         """
         if self.metric_oid is None:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT oid, typarray FROM pg_type "
-                    "WHERE typname = 'metric'")
-                self.metric_oid, self.array_oid = cursor.fetchone()
-            except Exception:
-                # metric type is not defined yet... nevermind.
-                pass
+            cursor = conn.cursor()
+            res = self._get_metric_type(cursor)
+            if res is None:
+                self._create_metric_type(cursor)
+                res = self._get_metric_type(cursor)
+            self.metric_oid, self.array_oid = res
 
         if self.metric_oid is not None:
             metric_type = psycopg2.extensions.new_type((self.metric_oid,),
                                                        "metric", _cast_metric)
-            psycopg2.extensions.register_type(metric_type)
             array_type = psycopg2.extensions.new_array_type((self.array_oid,),
                                                             'metric[]',
                                                             metric_type)
+            psycopg2.extensions.register_type(metric_type)
             psycopg2.extensions.register_type(array_type)
 
             self.type_registered = True
 
     def _connect(self, key=None):
         conn = super()._connect(key)
+        conn.set_session(autocommit=True)
         if not self.type_registered:
             self._register_metric_types(conn)
         return conn
@@ -117,11 +128,11 @@ class MetricConnectionPool(psycopg2.pool.ThreadedConnectionPool):
             # TODO: propose upstream a better way to deal with growing pools
             # TODO: check how this is done in psycopg3
             if str(e) == 'connection pool exhausted':
-                # prevent pool exhaustion "
+                # prevent pool exhaustion :
                 _connection_pool.maxconn += 1
                 # prevent closing connections :
                 _connection_pool.minconn = _connection_pool.maxconn
-                conn = _connection_pool.getconn()
+                conn = super().getconn(key)
             else:
                 raise
         return conn
@@ -172,13 +183,6 @@ def database_init(config):
     global _connection_pool
     global _connection_pool_lock
 
-    schema = [
-        '''CREATE TYPE metric AS (time_stamp TIMESTAMP(0) WITH TIME ZONE,
-                                  response_time INTEGER, return_code INTEGER,
-                                  regex_check BOOL);''',
-        '''CREATE TABLE websites (id SERIAL PRIMARY KEY, url VARCHAR,
-                                  regexp text, metrics metric[]);'''
-    ]
     conn = _get_db_connection(config)
     cursor = conn.cursor()
 
@@ -187,12 +191,8 @@ def database_init(config):
         raise DatabaseError(f"Can't acquire lock to connect to database")
 
     # Reset database if it exists already
-    try:
-        cursor.execute('DROP TABLE websites;')
-        cursor.execute('DROP TYPE metric;')
-        conn.commit()
-    except Exception:
-        pass
+    cursor.execute('DROP TABLE IF EXISTS websites;')
+    cursor.execute('DROP TYPE IF EXISTS metric;')
     _release_db_connection(conn)
     _connection_pool.closeall()
 
@@ -202,9 +202,8 @@ def database_init(config):
 
     conn = _get_db_connection(config)
     cursor = conn.cursor()
-    for sql in schema:
-        cursor.execute(sql)
-    conn.commit()
+    cursor.execute('CREATE TABLE websites (id SERIAL PRIMARY KEY, url VARCHAR,'
+                   'regexp text, metrics metric[])')
     _release_db_connection(conn)
 
 
@@ -298,7 +297,6 @@ def kafka_send_metric(config, url_id, timestamp, response_time, return_code,
     metric = (url_id, timestamp.isoformat(' ', timespec='seconds'),
               response_time, return_code, regex_check)
     msg = bytes(json.dumps(metric).encode('utf-8'))
-    print(msg)
     p.send(config['kafka-topic'], msg)
 
 
@@ -336,7 +334,6 @@ def url_add(config, url, regexp=None):
     cursor.execute('INSERT INTO websites (url, regexp, metrics) '
                    "VALUES (%s, %s, '{}') RETURNING id;", (url, regexp))
     _id = cursor.fetchone()[0]
-    conn.commit()
     _release_db_connection(conn)
     return _id
 
@@ -348,7 +345,6 @@ def url_remove(config, url_id):
     conn = _get_db_connection(config)
     cursor = conn.cursor()
     cursor.execute('DELETE FROM websites WHERE id = %s;', (url_id,))
-    conn.commit()
     _release_db_connection(conn)
 
 

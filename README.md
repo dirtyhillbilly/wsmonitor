@@ -121,4 +121,6 @@ Table `websites` holds all the metrics, and is defined by :
 # TODO #
 
 * [ ] Use timelapsedb, as it is available on aiven.io platform
+* [ ] Use a kafka topic to report completion in tests (c.f. `test_api.py`)
 * [ ] This document lacks a ton of informations to get wsmonitor run seamlessly
+* [ ] systemd services to start checker and dbupdate daemons

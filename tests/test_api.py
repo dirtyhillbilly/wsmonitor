@@ -1,5 +1,7 @@
 from wsmonitor import api
 from wsmonitor.checker import check_url
+from wsmonitor.dbupdate import do_dbupdate
+
 import time
 import threading
 
@@ -53,11 +55,16 @@ def test_url_check():
 
     checks = {}
 
+    # Start kafka consumer processing threads
+    updatedb = threading.Thread(target=do_dbupdate, daemon=True,
+                                kwargs={'config': config})
+    updatedb.start()
+
     # check each URL once
     for url, regexp, return_code, regexp_check in cases:
         _id = api.url_add(config, url, regexp)
 
-        t = threading.Thread(target=check_url, daemon=False,
+        t = threading.Thread(target=check_url, daemon=True,
                              kwargs={'url_id': _id, 'url': url,
                                      'regexp': regexp, 'timeout': 30})
         checks[_id] = (t, url, return_code, regexp_check)
@@ -66,11 +73,12 @@ def test_url_check():
     for t in checks.values():
         t[0].join()
 
-    time.sleep(10)
+    # ugly sleep
+    # TODO: use a kafka topic to report test completions
+    time.sleep(5)
 
     # gather results
     for _id, url, metrics in api.url_status(config, checks.keys()):
-        print(metrics)
         _, _, return_code, regex_check = metrics[-1]
         assert url == checks[_id][1]
         assert return_code == checks[_id][2]
