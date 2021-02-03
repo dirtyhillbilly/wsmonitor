@@ -1,0 +1,13 @@
+{
+    "database-host": "wsmon-pg-praksys-41e8.aivencloud.com",
+    "database-name": "wsmonitor",
+    "database-password": "fjm6xcctiilz2yn2",
+    "database-port": 15383,
+    "database-user": "avnadmin",
+    "kafka-broker": "wsmon-kafka-praksys-41e8.aivencloud.com:15396",
+    "kafka-user": "avnadmin",
+    "kafka-password": "sbrnbs6a90rdniip",
+    "kafka-topic": "wsmonitor",
+    "pretty-print": false,
+    "kafka-ca-file": "~/.config/wsmonitor/ca.crt"
+}

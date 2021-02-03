@@ -3,6 +3,7 @@
 
 - [Install](#install)
     - [Requirements](#requirements)
+- [Running daemons](#running-daemons)
 - [Command line interface](#command-line-interface)
     - [Commands](#commands)
         - [`url`](#url)
@@ -32,9 +33,8 @@ For testing purpose, from source root directory, you can install `wsmonitor` dep
 # Running daemons #
 
 In the virtual environement, two programs are available :
-- `wsmonitor-checker-daemon` : this daemon scans the database for URLs to monitor and report to kafka queue ;
-- `wsmonitor-dbupdate-daemon` : this daemon consume kafka events and feed postgresql database.
-
+- `wsmonitor-checker-daemon` : this daemon scans the database for URLs to monitor, produces metric and report to kafka queue ;
+- `wsmonitor-dbupdate-daemon` : this daemon consumes kafka events and feed postgresql database.
 
 # Command line interface #
 
@@ -82,14 +82,14 @@ In `database` mode, wsmonitor can initialize or reset database.
 
 ### `config` ###
 
-`config` mode allows getting and modifying `wsmonitor` [configuration parameters]#configuration-parameters.
+`config` mode allows getting and modifying `wsmonitor` [configuration parameters](#configuration-parameters).
 E.g., current configuration can be viewed with :
 
 `wsmonitor -p config get`
 
 ## Configuration parameters ##
 
-Configuration file, by default `$HOME/.config/wsmonitor/config.json`, is a JSON object with the following, quite self-explanatory, fields:
+Configuration file `config.json`, is a JSON object with the following fields:
 
 - `database-host` :
 - `database-name` :
@@ -101,7 +101,9 @@ Configuration file, by default `$HOME/.config/wsmonitor/config.json`, is a JSON 
 - `kafka-password`:
 - `kafka-topic` :
 - `kafka-ca-file` : "~/.config/wsmonitor/ca.crt"
-- `pretty-print` : Whether to pretty-print results. Valid values are ``true` or `false`.
+- `pretty-print` : Whether to pretty-print results. Valid values are `true` or `false`.
+
+`wsmonitor` daemons and command line interface will look for `config.json` file in `$WSMONITORDIR` or `$HOME/.config/wsmonitor/`
 
 # Database schema #
 
@@ -116,11 +118,10 @@ Table `websites` holds all the metrics, and is defined by :
     CREATE TABLE websites (id SERIAL PRIMARY KEY, url VARCHAR,
                            regexp text, metrics metric[])
 
-
-
 # TODO #
 
 * [ ] Use timelapsedb, as it is available on aiven.io platform
 * [ ] Use a kafka topic to report completion in tests (c.f. `test_api.py`)
 * [ ] This document lacks a ton of informations to get wsmonitor run seamlessly
 * [ ] systemd services to start checker and dbupdate daemons
+* [ ] Package data are cumbersome as implemented. Use setuptools.config.

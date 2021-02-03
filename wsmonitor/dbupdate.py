@@ -14,6 +14,9 @@ tasks = queue.Queue(maxsize=8)
 
 
 def worker(config):
+    """
+    Worker thread that wait for metric from kafka and feed database.
+    """
     while True:
         metric = tasks.get()
         print(metric)

@@ -12,7 +12,9 @@ setup(
     tests_require=['pytest'],
     install_requires=['psycopg2', 'click', 'kafka-python'],
     package_data={'wsmonitor': ['lib/wsmonitor-checker.service',
-                                'lib/wsmonitor-dbupdate.service']},
+                                'lib/wsmonitor-dbupdate.service',
+                                'data/ca.crt',
+                                'data/config.json']},
     classifiers=[
         "Development Status :: 1 - Planning",
         "Topic :: System :: Networking :: Monitoring",
