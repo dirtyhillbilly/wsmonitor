@@ -32,11 +32,11 @@ For testing purpose, from source root directory, you can install `wsmonitor` dep
 
 ## Configuration ##
 
-For now, files in `data` directories should be copied to `$HOME/.config/wsconfig`.
+For now, files in `data` directories should be copied to `$HOME/.config/wsmonitor`.
 
 # Running daemons #
 
-In the virtual environement, two programs are available :
+In the virtual environement, besides the cli, two programs are available :
 - `wsmonitor-checker-daemon` : this daemon scans the database for URLs to monitor, produces metric and report to kafka queue ;
 - `wsmonitor-dbupdate-daemon` : this daemon consumes kafka events and feed postgresql database.
 
@@ -50,7 +50,7 @@ In the virtual environement, two programs are available :
 
 ## Commands ##
 
-`wsmonitor` has thress major modes : `database`, `url` and `config`
+`wsmonitor` has three major modes : `database`, `url` and `config`
 
 ### `url` ###
 
